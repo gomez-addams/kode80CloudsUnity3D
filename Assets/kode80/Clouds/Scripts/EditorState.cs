@@ -20,9 +20,9 @@ using System.Collections;
 
 #if UNITY_EDITOR
 using UnityEditor;
-    #if UNITY_5_3_OR_NEWER
+	#if UNITY_5_3 || UNITY_5_3_OR_NEWER
 	using UnityEditor.SceneManagement;
-    #endif
+	#endif
 #endif
 
 
@@ -30,7 +30,7 @@ namespace kode80.Clouds
 {
 	public class EditorState : MonoBehaviour
 	{
-
+		
 #if UNITY_EDITOR
 
 		public BehaviorStateStore cameraComponentStates;
@@ -78,7 +78,7 @@ namespace kode80.Clouds
 		public RenderTexture tempCoverage { get { return _tempCoverage; } }
 
 
-        #region Public 
+		#region Public 
 
 		void Reset()
 		{
@@ -90,11 +90,11 @@ namespace kode80.Clouds
 
 		public void MarkSceneDirty()
 		{
-        #if UNITY_5_3_OR_NEWER
+		#if UNITY_5_3 || UNITY_5_3_OR_NEWER
 			EditorSceneManager.MarkSceneDirty( EditorSceneManager.GetActiveScene());
-        #else
+		#else
 			EditorApplication.MarkSceneDirty();
-        #endif
+		#endif
 		}
 
 		public bool EditorWindowEnabled()
@@ -207,9 +207,9 @@ namespace kode80.Clouds
 			}
 		}
 
-        #endregion
+		#endregion
 
-        #region Private
+		#region Private
 
 		private void CreateTempCoverage()
 		{
@@ -269,9 +269,9 @@ namespace kode80.Clouds
 			coveragePath = null;
 		}
 
-        #endregion
+		#endregion
 
 #endif
 
-    }
+	}
 }

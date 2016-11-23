@@ -23,10 +23,10 @@ namespace kode80.Clouds
 	public class kode80Clouds : MonoBehaviour 
 	{	
 		public enum SubPixelSize {
-			Sub1x1,
-			Sub2x2,
-			Sub4x4,
-			Sub8x8,	
+			Sub1x1 = 1,
+			Sub2x2 = 2,
+			Sub4x4 = 4,
+			Sub8x8 = 8,	
 		}
 
 		public enum RenderSize {
@@ -131,7 +131,6 @@ namespace kode80.Clouds
 		private Material _cloudMaterial;
 		private Material _cloudCombinerMaterial;
 		private Material _cloudBlenderMaterial;
-		private Material _cloudShadowPassMaterial;
 		private Camera _camera;
 		private Texture3D _perlin3D;
 		private Texture3D _detail3D;
@@ -247,12 +246,13 @@ namespace kode80.Clouds
 		
 		void Start () 
 		{
-            SetCamera( targetCamera);
-			_cloudsSharedProperties = new Clouds.SharedProperties();
-			UpdateSharedFromPublicProperties();
 			CreateMaterialsIfNeeded();
 			CreateRenderTextures();
-            CreateFullscreenQuad();
+			CreateFullscreenQuad();
+			SetCamera( targetCamera);
+
+			_cloudsSharedProperties = new Clouds.SharedProperties();
+			UpdateSharedFromPublicProperties();
 		}
 
 		void Awake()
@@ -305,6 +305,13 @@ namespace kode80.Clouds
 			if( theCamera != _camera)
 			{
 				_camera = theCamera;
+
+				if( _fullScreenQuad)
+				{
+					_fullScreenQuad.targetCamera = theCamera;
+					_fullScreenQuad.transform.localPosition = new Vector3( 0, 0, theCamera.farClipPlane - 10.0f);
+					_fullScreenQuad.transform.SetParent( _camera.transform, false);
+				}
 			}
 		}
 		
@@ -318,7 +325,7 @@ namespace kode80.Clouds
 			_cloudsSharedProperties.atmosphereStartHeight = atmosphereStartHeight;
 			_cloudsSharedProperties.atmosphereEndHeight = atmosphereEndHeight;
 			_cloudsSharedProperties.cameraPosition = new Vector3( 0.0f, earthRadius, 0.0f);
-			_cloudsSharedProperties.subPixelSize = SubPixelSizeToInt( subPixelSize);
+			_cloudsSharedProperties.subPixelSize = (int)subPixelSize;
 			_cloudsSharedProperties.downsample = downsample;
 			_cloudsSharedProperties.useFixedDimensions = renderSize == RenderSize.FixedDimensions;
 			_cloudsSharedProperties.fixedWidth = fixedWidth;
@@ -331,22 +338,7 @@ namespace kode80.Clouds
 			_cloudGradientVector2 = CloudHeightGradient( cloudGradient2);
 			_cloudGradientVector3 = CloudHeightGradient( cloudGradient3);
 		}
-		
-		private int SubPixelSizeToInt( SubPixelSize size)
-		{
-			int value = 2;
 
-			switch( size)
-			{
-				case SubPixelSize.Sub1x1: value = 1; break;
-				case SubPixelSize.Sub2x2: value = 2; break;
-				case SubPixelSize.Sub4x4: value = 4; break;
-				case SubPixelSize.Sub8x8: value = 8; break;
-			}
-
-			return value;
-		}
-		
 		public void RenderClouds()
 		{	
 			if( _camera == null)
@@ -451,21 +443,15 @@ namespace kode80.Clouds
 				_cloudBlenderMaterial = new Material( Shader.Find( "Hidden/kode80/CloudBlender"));
 				_cloudBlenderMaterial.hideFlags = HideFlags.HideAndDontSave;
 			}
-			
-			if( _cloudShadowPassMaterial == null)
-			{
-				_cloudShadowPassMaterial = new Material( Shader.Find( "Hidden/kode80/CloudShadowPass"));
-				_cloudShadowPassMaterial.hideFlags = HideFlags.HideAndDontSave;
-			}
-			
+
 			if( _perlin3D == null)
 			{
-				_perlin3D = Load3DTexture( "kode80Clouds/noise", 128, TextureFormat.RGBA32);
+				_perlin3D = Texture3DUtil.Load( "kode80Clouds/noise", 128, TextureFormat.RGBA32);
 			}
 			
 			if( _detail3D == null)
 			{
-				_detail3D = Load3DTexture( "kode80Clouds/noise_detail", 32, TextureFormat.RGB24);
+				_detail3D = Texture3DUtil.Load( "kode80Clouds/noise_detail", 32, TextureFormat.RGB24);
 			}
 
 			if( _curlTexture == null)
@@ -479,10 +465,13 @@ namespace kode80.Clouds
             if (Application.isPlaying && _fullScreenQuad == null)
             {
                 GameObject quadGO = new GameObject("CloudsFullscreenQuad", typeof(FullScreenQuad));
-                quadGO.hideFlags = HideFlags.HideAndDontSave;
+				quadGO.hideFlags = HideFlags.DontSave;
                 _fullScreenQuad = quadGO.GetComponent<FullScreenQuad>();
                 _fullScreenQuad.material = _cloudBlenderMaterial;
-                _fullScreenQuad.renderWhenPlaying = true;
+
+				if( _camera != null) {
+					_fullScreenQuad.transform.SetParent( _camera.transform, false);
+				}
             }
         }
 
@@ -494,32 +483,6 @@ namespace kode80.Clouds
                 _fullScreenQuad = null;
             }
         }
-
-        private Texture3D Load3DTexture( string name, int size, TextureFormat format)
-		{
-			int count = size * size * size;
-			TextAsset asset = Resources.Load<TextAsset>( name);
-			Color32[] colors = new Color32[ count];
-			byte[] bytes = asset.bytes;
-			int j=0;
-			
-			for( int i=0; i<count; i++)
-			{
-				colors[i].r = bytes[j++];
-				colors[i].g = bytes[j++];
-				colors[i].b = bytes[j++];
-				colors[i].a = format == TextureFormat.RGBA32 ? bytes[j++] : (byte)255;
-			}
-			
-			Texture3D texture3D = new Texture3D( size, size, size, format, true);
-			texture3D.hideFlags = HideFlags.HideAndDontSave;
-			texture3D.wrapMode = TextureWrapMode.Repeat;
-			texture3D.filterMode = FilterMode.Bilinear;
-			texture3D.SetPixels32( colors, 0);
-			texture3D.Apply();
-			
-			return texture3D;
-		}
 		
 		private void DestroyMaterials()
 		{
@@ -531,10 +494,7 @@ namespace kode80.Clouds
 			
 			DestroyImmediate( _cloudBlenderMaterial);
 			_cloudBlenderMaterial = null;
-			
-			DestroyImmediate( _cloudShadowPassMaterial);
-			_cloudShadowPassMaterial = null;
-			
+
 			DestroyImmediate( _perlin3D);
 			_perlin3D = null;
 
@@ -549,23 +509,24 @@ namespace kode80.Clouds
 		{
 			if( _subFrame == null && _camera != null)
 			{
-				RenderTextureFormat format = _camera.hdr ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
-				_subFrame = new RenderTexture( _cloudsSharedProperties.subFrameWidth, 
-					_cloudsSharedProperties.subFrameHeight, 0, format, RenderTextureReadWrite.Linear);
-				_subFrame.filterMode = FilterMode.Bilinear;
-				_subFrame.hideFlags = HideFlags.HideAndDontSave;
+				_subFrame = CreateRenderTexture( _cloudsSharedProperties.subFrameWidth, _cloudsSharedProperties.subFrameHeight);
 				_isFirstFrame = true;
 			}
 			
 			if( _previousFrame == null && _camera != null)
 			{
-				RenderTextureFormat format = _camera.hdr ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
-				_previousFrame = new RenderTexture( _cloudsSharedProperties.frameWidth, 
-					_cloudsSharedProperties.frameHeight, 0, format, RenderTextureReadWrite.Linear);
-				_previousFrame.filterMode = FilterMode.Bilinear;
-				_previousFrame.hideFlags = HideFlags.HideAndDontSave;
+				_previousFrame = CreateRenderTexture( _cloudsSharedProperties.frameWidth, _cloudsSharedProperties.frameHeight);
 				_isFirstFrame = true;
 			}
+		}
+
+		private RenderTexture CreateRenderTexture( int width, int height)
+		{
+			RenderTextureFormat format = _camera.hdr ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
+			var texture = new RenderTexture( width, height, 0, format, RenderTextureReadWrite.Linear);
+			texture.filterMode = FilterMode.Bilinear;
+			texture.hideFlags = HideFlags.HideAndDontSave;
+			return texture;
 		}
 
 		private void DestroyRenderTextures()
