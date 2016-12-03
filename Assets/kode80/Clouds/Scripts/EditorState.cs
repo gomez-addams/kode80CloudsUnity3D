@@ -248,7 +248,11 @@ namespace kode80.Clouds
                 AssetDatabase.Refresh();
                 
                 TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+#if UNITY_5_5_OR_NEWER
+                importer.textureType = TextureImporterType.Default;
+#else
                 importer.textureType = TextureImporterType.Advanced;
+#endif
                 importer.generateMipsInLinearSpace = true;
                 importer.linearTexture = true;
                 importer.textureFormat = TextureImporterFormat.AutomaticTruecolor;
